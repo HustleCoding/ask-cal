@@ -18,10 +18,29 @@ const fraunces = Fraunces({
   axes: ["opsz", "SOFT", "WONK"],
 });
 
+const description =
+  "Ask Cal Newport anything. Answers grounded in 1,117 of his essays (2007–present) — deep work, digital minimalism, slow productivity — with the original articles cited.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+      (process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000")
+  ),
   title: "Ask Cal — answers from Cal Newport's archive",
-  description:
-    "A chatbot grounded in 1,117 calnewport.com articles (2007–present). Deep work, digital minimalism, slow productivity.",
+  description,
+  openGraph: {
+    title: "Ask Cal",
+    description,
+    siteName: "Ask Cal",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ask Cal",
+    description,
+  },
 };
 
 export default function RootLayout({
