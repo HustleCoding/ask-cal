@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import type { UIMessage } from "ai";
 import { useState } from "react";
 import {
   Conversation,
@@ -27,6 +28,8 @@ import { Streamdown } from "streamdown";
 import { Spinner } from "@/components/ui/spinner";
 import { BookOpenIcon } from "lucide-react";
 
+type AskCalMessage = UIMessage<never, { followups: string[] }>;
+
 const SUGGESTIONS = [
   "How do I get started with deep work?",
   "Is it worth quitting social media?",
@@ -35,7 +38,8 @@ const SUGGESTIONS = [
 ];
 
 export default function Home() {
-  const { messages, sendMessage, status } = useChat();
+  const { messages, sendMessage, status } = useChat<AskCalMessage>();
+  const lastMessage = messages[messages.length - 1];
   const [input, setInput] = useState("");
 
   const handleSubmit = (message: PromptInputMessage) => {
@@ -133,6 +137,28 @@ export default function Home() {
                   </Message>
                 ) : null
               )}
+              {message.role === "assistant" &&
+                message.id === lastMessage?.id &&
+                status === "ready" &&
+                message.parts.map((part, i) =>
+                  part.type === "data-followups" ? (
+                    <div
+                      className="mt-3 flex flex-wrap gap-2"
+                      key={`${message.id}-fu-${i}`}
+                    >
+                      {part.data.map((q) => (
+                        <button
+                          key={q}
+                          className="text-muted-foreground hover:border-primary/40 hover:text-accent-foreground bg-card rounded-full border px-3 py-1 text-xs shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm"
+                          onClick={() => sendMessage({ text: q })}
+                          type="button"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null
+                )}
             </div>
           ))}
           {status === "submitted" && <Spinner className="mx-auto my-4" />}
