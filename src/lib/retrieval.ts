@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
+import type { FeatureExtractionPipeline } from "@huggingface/transformers";
 
 export type Chunk = {
   id: number;
@@ -75,11 +75,28 @@ function load(): Indexed {
 
 let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
 
+async function createExtractor(): Promise<FeatureExtractionPipeline> {
+  const { pipeline, env } = await import("@huggingface/transformers");
+  const bundledCache = path.join(
+    process.cwd(),
+    "node_modules",
+    "@huggingface",
+    "transformers",
+    ".cache"
+  );
+  if (fs.existsSync(path.join(bundledCache, "Xenova/all-MiniLM-L6-v2/config.json"))) {
+    env.localModelPath = bundledCache;
+    env.allowLocalModels = true;
+  }
+  env.cacheDir = "/tmp/transformers-cache";
+  return pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
+    dtype: "fp32",
+  });
+}
+
 async function embedQuery(text: string, dim: number): Promise<Float32Array | null> {
   try {
-    extractorPromise ??= pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
-      dtype: "fp32",
-    });
+    extractorPromise ??= createExtractor();
     const extractor = await extractorPromise;
     const result = await extractor(text.slice(0, 2000), {
       pooling: "mean",
