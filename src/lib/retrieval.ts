@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import zlib from "zlib";
 import type { FeatureExtractionPipeline } from "@huggingface/transformers";
 
 export type Chunk = {
@@ -7,6 +8,7 @@ export type Chunk = {
   title: string;
   url: string;
   date: string;
+  type: "article" | "podcast";
   text: string;
 };
 
@@ -41,8 +43,10 @@ function tokenize(text: string): string[] {
 
 function load(): Indexed {
   if (indexed) return indexed;
-  const file = path.join(process.cwd(), "data", "chunks.json");
-  const chunks: Chunk[] = JSON.parse(fs.readFileSync(file, "utf8"));
+  const file = path.join(process.cwd(), "data", "chunks.json.gz");
+  const chunks: Chunk[] = JSON.parse(
+    zlib.gunzipSync(fs.readFileSync(file)).toString("utf8")
+  );
   const docTerms: Map<string, number>[] = [];
   const titleTerms: Set<string>[] = [];
   const docLengths: number[] = [];
@@ -131,6 +135,8 @@ const B = 0.75;
 const TITLE_BOOST = 0.18;
 const RECENCY_BOOST = 0.12;
 const SEMANTIC_WEIGHT = 0.55;
+// Essays are edited prose; transcripts are rambly speech. Favor essays on ties.
+const PODCAST_FACTOR = 0.92;
 
 export async function search(query: string, topK = 8): Promise<SearchResult[]> {
   const { chunks, docTerms, titleTerms, docLengths, avgDocLength, df, embeddings, dim } =
@@ -174,7 +180,8 @@ export async function search(query: string, topK = 8): Promise<SearchResult[]> {
       qTokens.length > 0 ? 1 + TITLE_BOOST * (titleHits / qTokens.length) : 1;
     const age = Math.max(0, nowYear - Number(chunks[i].date.slice(0, 4)));
     const recencyFactor = 1 + RECENCY_BOOST * Math.exp(-age / 8);
-    scores[i] *= titleFactor * recencyFactor;
+    const typeFactor = chunks[i].type === "podcast" ? PODCAST_FACTOR : 1;
+    scores[i] *= titleFactor * recencyFactor * typeFactor;
   }
 
   const order = Array.from({ length: n }, (_, i) => i)

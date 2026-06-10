@@ -3,6 +3,7 @@
 // Usage: node scripts/build-embeddings.mjs
 import fs from "fs";
 import path from "path";
+import zlib from "zlib";
 import { pipeline } from "@huggingface/transformers";
 
 const MODEL = "Xenova/all-MiniLM-L6-v2";
@@ -10,7 +11,9 @@ const BATCH = 32;
 
 const root = process.cwd();
 const chunks = JSON.parse(
-  fs.readFileSync(path.join(root, "data", "chunks.json"), "utf8")
+  zlib
+    .gunzipSync(fs.readFileSync(path.join(root, "data", "chunks.json.gz")))
+    .toString("utf8")
 );
 
 const extractor = await pipeline("feature-extraction", MODEL, {

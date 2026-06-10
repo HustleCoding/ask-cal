@@ -13,7 +13,13 @@ type AskCalMessage = UIMessage<
   never,
   {
     followups: string[];
-    sources: { title: string; url: string; year: string; excerpt: string }[];
+    sources: {
+      title: string;
+      url: string;
+      year: string;
+      excerpt: string;
+      type: "article" | "podcast";
+    }[];
   }
 >;
 
@@ -21,9 +27,9 @@ export const maxDuration = 60;
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
-const SYSTEM = `You are "Ask Cal", an assistant that answers questions about productivity, deep work, digital minimalism, studying, and career advice using Cal Newport's blog archive (calnewport.com, 2007-present).
+const SYSTEM = `You are "Ask Cal", an assistant that answers questions about productivity, deep work, digital minimalism, studying, and career advice using Cal Newport's blog archive (calnewport.com, 2007-present) and transcripts of his Deep Questions podcast.
 
-Answer in Cal Newport's voice and perspective: thoughtful, contrarian about technology hype, focused on depth over busyness. Ground every answer in the provided article excerpts. Cite articles inline by their title in brackets, e.g. [The Deep Work Hypothesis] — always the title, never a number. If the excerpts don't cover the question, say so honestly rather than inventing positions.
+Answer in Cal Newport's voice and perspective: thoughtful, contrarian about technology hype, focused on depth over busyness. Ground every answer in the provided excerpts (blog articles and podcast episodes). Cite sources inline by their title in brackets, e.g. [The Deep Work Hypothesis] — always the title, never a number. If the excerpts don't cover the question, say so honestly rather than inventing positions.
 
 Be brief. Hard limit: 120 words. Give the core idea and 2-3 practical points (a short bullet list is fine, but never add a label or heading for it). Quote at most one short phrase from the excerpts — never long quotations. No preamble, no recap sentence at the end.
 
@@ -63,7 +69,8 @@ export async function POST(req: Request) {
 
   const context = results
     .map(
-      (r) => `Article: "${r.title}" (${r.date})\nURL: ${r.url}\n${r.text}`
+      (r) =>
+        `${r.type === "podcast" ? "Podcast episode" : "Article"}: "${r.title}" (${r.date})\nURL: ${r.url}\n${r.text}`
     )
     .join("\n\n---\n\n");
 
@@ -73,7 +80,13 @@ export async function POST(req: Request) {
     execute: ({ writer }) => {
       writer.write({ type: "start" });
       const seen = new Set<string>();
-      const sources: { title: string; url: string; year: string; excerpt: string }[] = [];
+      const sources: {
+        title: string;
+        url: string;
+        year: string;
+        excerpt: string;
+        type: "article" | "podcast";
+      }[] = [];
       for (const r of results) {
         if (seen.has(r.url)) continue;
         seen.add(r.url);
@@ -82,13 +95,14 @@ export async function POST(req: Request) {
           url: r.url,
           year: r.date.slice(0, 4),
           excerpt: r.excerpt,
+          type: r.type,
         });
       }
       writer.write({ type: "data-sources", data: sources });
 
       const result = streamText({
         model: openrouter.chat("deepseek/deepseek-v4-flash"),
-        system: `${SYSTEM}\n\nRelevant excerpts from Cal Newport's blog:\n\n${context}`,
+        system: `${SYSTEM}\n\nRelevant excerpts from Cal Newport's blog and podcast:\n\n${context}`,
         messages: modelMessages,
       });
 

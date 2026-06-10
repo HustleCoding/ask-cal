@@ -30,7 +30,13 @@ type AskCalMessage = UIMessage<
   never,
   {
     followups: string[];
-    sources: { title: string; url: string; year: string; excerpt: string }[];
+    sources: {
+      title: string;
+      url: string;
+      year: string;
+      excerpt: string;
+      type: "article" | "podcast";
+    }[];
   }
 >;
 
@@ -94,7 +100,7 @@ export default function Home() {
             Ask Cal
           </h1>
           <p className="text-muted-foreground truncate text-xs">
-            Grounded in 1,117 calnewport.com essays · 2007–present
+            1,117 essays + 400 Deep Questions episodes · 2007–present
           </p>
         </div>
         <span className="text-accent-foreground bg-accent ml-auto hidden shrink-0 rounded-full px-3 py-1 text-xs font-medium sm:inline">
@@ -124,9 +130,9 @@ export default function Home() {
                   What would Cal Newport say?
                 </h2>
                 <p className="text-muted-foreground mx-auto mt-3 max-w-md text-sm leading-relaxed">
-                  Every answer is drawn from his actual essays — deep work,
-                  digital minimalism, study habits, slow productivity — with
-                  the original articles cited.
+                  Every answer is drawn from his essays and Deep Questions
+                  podcast — deep work, digital minimalism, study habits, slow
+                  productivity — with the original sources cited.
                 </p>
                 <div className="mt-7 flex flex-wrap justify-center gap-2">
                   {SUGGESTIONS.map((s) => (
@@ -178,7 +184,7 @@ export default function Home() {
                       <div key={`${message.id}-srcs-${i}`}>
                         <p className="text-muted-foreground mb-2.5 flex items-center gap-1.5 text-xs font-medium tracking-[0.14em] uppercase">
                           <LibraryIcon className="size-3.5" />
-                          From the archive
+                          From the archive & podcast
                         </p>
                         <div className="grid gap-2 sm:grid-cols-2">
                           {part.data.slice(0, 4).map((s) => (
@@ -196,7 +202,10 @@ export default function Home() {
                                 “{s.excerpt}”
                               </span>
                               <span className="text-muted-foreground/80 mt-1.5 block text-[11px]">
-                                calnewport.com · {s.year}
+                                {s.type === "podcast"
+                                  ? "Deep Questions podcast"
+                                  : "calnewport.com"}{" "}
+                                · {s.year}
                               </span>
                             </a>
                           ))}
