@@ -9,7 +9,13 @@ import {
 } from "ai";
 import { search } from "@/lib/retrieval";
 
-type AskCalMessage = UIMessage<never, { followups: string[] }>;
+type AskCalMessage = UIMessage<
+  never,
+  {
+    followups: string[];
+    sources: { title: string; url: string; year: string; excerpt: string }[];
+  }
+>;
 
 export const maxDuration = 60;
 
@@ -19,7 +25,15 @@ const SYSTEM = `You are "Ask Cal", an assistant that answers questions about pro
 
 Answer in Cal Newport's voice and perspective: thoughtful, contrarian about technology hype, focused on depth over busyness. Ground every answer in the provided article excerpts. Cite articles inline by their title in brackets, e.g. [The Deep Work Hypothesis] — always the title, never a number. If the excerpts don't cover the question, say so honestly rather than inventing positions.
 
-Be brief. Hard limit: 120 words. Give the core idea and 2-3 practical points (a short bullet list is fine, but never add a label or heading for it). Quote at most one short phrase from the excerpts — never long quotations. No preamble, no recap sentence at the end.`;
+Be brief. Hard limit: 120 words. Give the core idea and 2-3 practical points (a short bullet list is fine, but never add a label or heading for it). Quote at most one short phrase from the excerpts — never long quotations. No preamble, no recap sentence at the end.
+
+Writing rules (anti-slop):
+- Never use these phrases or close variants: "Here's the thing", "At its core", "At the end of the day", "It's worth noting", "The reality is", "The bottom line", "In other words", "To put it simply", "The key insight is", "It's not just about X — it's about Y", "Let's dive in", "In today's world".
+- Don't open with a broad sweeping claim; start with the actual answer.
+- Don't end with a dramatic one-sentence kicker or a restated thesis.
+- Don't hedge every claim ("might", "could potentially") — commit or omit.
+- Avoid: "landscape", "leverage", "robust", "seamless", "holistic", "crucial", "delve", "navigate" (metaphorically), "unlock" (metaphorically), "game-changing", "transformative".
+- Write like Cal's actual prose: plain, direct, specific. Vary structure between answers.`;
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
@@ -45,7 +59,7 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join(" ");
 
-  const results = search(query, 8);
+  const results = await search(query, 8);
 
   const context = results
     .map(
@@ -59,16 +73,18 @@ export async function POST(req: Request) {
     execute: ({ writer }) => {
       writer.write({ type: "start" });
       const seen = new Set<string>();
+      const sources: { title: string; url: string; year: string; excerpt: string }[] = [];
       for (const r of results) {
         if (seen.has(r.url)) continue;
         seen.add(r.url);
-        writer.write({
-          type: "source-url",
-          sourceId: r.url,
+        sources.push({
+          title: r.title,
           url: r.url,
-          title: `${r.title} (${r.date.slice(0, 4)})`,
+          year: r.date.slice(0, 4),
+          excerpt: r.excerpt,
         });
       }
+      writer.write({ type: "data-sources", data: sources });
 
       const result = streamText({
         model: openrouter.chat("deepseek/deepseek-v4-flash"),

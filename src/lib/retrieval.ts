@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { pipeline, type FeatureExtractionPipeline } from "@huggingface/transformers";
 
 export type Chunk = {
   id: number;
@@ -9,6 +10,8 @@ export type Chunk = {
   text: string;
 };
 
+export type SearchResult = Chunk & { excerpt: string };
+
 type Indexed = {
   chunks: Chunk[];
   docTerms: Map<string, number>[];
@@ -16,6 +19,8 @@ type Indexed = {
   docLengths: number[];
   avgDocLength: number;
   df: Map<string, number>;
+  embeddings: Float32Array | null;
+  dim: number;
 };
 
 let indexed: Indexed | null = null;
@@ -52,17 +57,67 @@ function load(): Indexed {
     for (const t of tf.keys()) df.set(t, (df.get(t) ?? 0) + 1);
   }
   const avgDocLength = docLengths.reduce((a, b) => a + b, 0) / docLengths.length;
-  indexed = { chunks, docTerms, titleTerms, docLengths, avgDocLength, df };
+
+  const dim = 384;
+  let embeddings: Float32Array | null = null;
+  const embFile = path.join(process.cwd(), "data", "embeddings.bin");
+  if (fs.existsSync(embFile)) {
+    const buf = fs.readFileSync(embFile);
+    const arr = new Float32Array(
+      buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+    );
+    if (arr.length === chunks.length * dim) embeddings = arr;
+  }
+
+  indexed = { chunks, docTerms, titleTerms, docLengths, avgDocLength, df, embeddings, dim };
   return indexed;
+}
+
+let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
+
+async function embedQuery(text: string, dim: number): Promise<Float32Array | null> {
+  try {
+    extractorPromise ??= pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
+      dtype: "fp32",
+    });
+    const extractor = await extractorPromise;
+    const result = await extractor(text.slice(0, 2000), {
+      pooling: "mean",
+      normalize: true,
+    });
+    const data = result.data as Float32Array;
+    return data.length === dim ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function pickExcerpt(text: string, qTokens: string[]): string {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text];
+  let best = sentences[0] ?? "";
+  let bestHits = -1;
+  for (const s of sentences) {
+    const lower = s.toLowerCase();
+    let hits = 0;
+    for (const t of qTokens) if (lower.includes(t)) hits++;
+    if (hits > bestHits && s.trim().length > 40) {
+      bestHits = hits;
+      best = s;
+    }
+  }
+  const trimmed = best.trim().replace(/\s+/g, " ");
+  return trimmed.length > 180 ? `${trimmed.slice(0, 177)}…` : trimmed;
 }
 
 const K1 = 1.5;
 const B = 0.75;
 const TITLE_BOOST = 0.18;
 const RECENCY_BOOST = 0.12;
+const SEMANTIC_WEIGHT = 0.55;
 
-export function search(query: string, topK = 8): Chunk[] {
-  const { chunks, docTerms, titleTerms, docLengths, avgDocLength, df } = load();
+export async function search(query: string, topK = 8): Promise<SearchResult[]> {
+  const { chunks, docTerms, titleTerms, docLengths, avgDocLength, df, embeddings, dim } =
+    load();
   const qTokens = [...new Set(tokenize(query))];
   const n = chunks.length;
   const scores = new Float64Array(n);
@@ -78,6 +133,21 @@ export function search(query: string, topK = 8): Chunk[] {
         (tf + K1 * (1 - B + (B * docLengths[i]) / avgDocLength));
     }
   }
+  // Blend normalized BM25 with cosine similarity when embeddings exist.
+  const qVec = embeddings ? await embedQuery(query, dim) : null;
+  if (embeddings && qVec) {
+    let maxBm25 = 0;
+    for (let i = 0; i < n; i++) if (scores[i] > maxBm25) maxBm25 = scores[i];
+    for (let i = 0; i < n; i++) {
+      let dot = 0;
+      const off = i * dim;
+      for (let d = 0; d < dim; d++) dot += embeddings[off + d] * qVec[d];
+      const cosine = Math.max(0, dot);
+      const bm25 = maxBm25 > 0 ? scores[i] / maxBm25 : 0;
+      scores[i] = (1 - SEMANTIC_WEIGHT) * bm25 + SEMANTIC_WEIGHT * cosine;
+    }
+  }
+
   const nowYear = new Date().getFullYear();
   for (let i = 0; i < n; i++) {
     if (scores[i] <= 0) continue;
@@ -94,14 +164,14 @@ export function search(query: string, topK = 8): Chunk[] {
     .filter((i) => scores[i] > 0)
     .sort((a, b) => scores[b] - scores[a]);
 
-  const results: Chunk[] = [];
+  const results: SearchResult[] = [];
   const seenUrls = new Map<string, number>();
   for (const i of order) {
     const c = chunks[i];
     const perUrl = seenUrls.get(c.url) ?? 0;
     if (perUrl >= 2) continue;
     seenUrls.set(c.url, perUrl + 1);
-    results.push(c);
+    results.push({ ...c, excerpt: pickExcerpt(c.text, qTokens) });
     if (results.length >= topK) break;
   }
   return results;

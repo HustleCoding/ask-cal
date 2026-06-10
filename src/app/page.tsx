@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -19,16 +19,23 @@ import {
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import {
-  Source,
   Sources,
   SourcesContent,
   SourcesTrigger,
 } from "@/components/ai-elements/sources";
 import { Streamdown } from "streamdown";
 import { Spinner } from "@/components/ui/spinner";
-import { BookOpenIcon } from "lucide-react";
+import { BookOpenIcon, SquarePenIcon } from "lucide-react";
 
-type AskCalMessage = UIMessage<never, { followups: string[] }>;
+type AskCalMessage = UIMessage<
+  never,
+  {
+    followups: string[];
+    sources: { title: string; url: string; year: string; excerpt: string }[];
+  }
+>;
+
+const STORAGE_KEY = "ask-cal-chat";
 
 const SUGGESTIONS = [
   "How do I get started with deep work?",
@@ -38,9 +45,33 @@ const SUGGESTIONS = [
 ];
 
 export default function Home() {
-  const { messages, sendMessage, status } = useChat<AskCalMessage>();
+  const { messages, sendMessage, status, stop, setMessages } =
+    useChat<AskCalMessage>();
   const lastMessage = messages[messages.length - 1];
   const [input, setInput] = useState("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    try {
+      setMessages(JSON.parse(saved));
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (status !== "ready") return;
+    if (messages.length === 0) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  }, [messages, status]);
+
+  const newChat = () => {
+    stop();
+    setMessages([]);
+    localStorage.removeItem(STORAGE_KEY);
+  };
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (!message.text.trim()) return;
@@ -65,6 +96,16 @@ export default function Home() {
         <span className="text-accent-foreground bg-accent ml-auto hidden shrink-0 rounded-full px-3 py-1 text-xs font-medium sm:inline">
           Deep work, on demand
         </span>
+        {messages.length > 0 && (
+          <button
+            className="text-muted-foreground hover:text-foreground hover:border-primary/40 bg-card ml-auto flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-xs transition-colors sm:ml-3"
+            onClick={newChat}
+            type="button"
+          >
+            <SquarePenIcon className="size-3.5" />
+            New chat
+          </button>
+        )}
       </header>
 
       <Conversation className="flex-1">
@@ -101,26 +142,33 @@ export default function Home() {
           {messages.map((message) => (
             <div key={message.id}>
               {message.role === "assistant" &&
-                message.parts.some((p) => p.type === "source-url") && (
-                  <Sources className="mb-1">
-                    <SourcesTrigger
-                      count={
-                        message.parts.filter((p) => p.type === "source-url")
-                          .length
-                      }
-                    />
-                    <SourcesContent>
-                      {message.parts
-                        .filter((p) => p.type === "source-url")
-                        .map((part, i) => (
-                          <Source
-                            key={`${message.id}-src-${i}`}
-                            href={part.url}
-                            title={part.title ?? part.url}
-                          />
+                message.parts.map((part, i) =>
+                  part.type === "data-sources" ? (
+                    <Sources className="mb-1" key={`${message.id}-srcs-${i}`}>
+                      <SourcesTrigger count={part.data.length} />
+                      <SourcesContent className="w-full max-w-xl">
+                        {part.data.map((s) => (
+                          <a
+                            key={s.url}
+                            href={s.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-card hover:border-primary/40 block rounded-xl border px-3.5 py-2.5 shadow-xs transition-colors"
+                          >
+                            <span className="text-foreground block text-sm font-medium">
+                              {s.title}{" "}
+                              <span className="text-muted-foreground font-normal">
+                                · {s.year}
+                              </span>
+                            </span>
+                            <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                              “{s.excerpt}”
+                            </span>
+                          </a>
                         ))}
-                    </SourcesContent>
-                  </Sources>
+                      </SourcesContent>
+                    </Sources>
+                  ) : null
                 )}
               {message.parts.map((part, i) =>
                 part.type === "text" ? (
@@ -133,6 +181,11 @@ export default function Home() {
                       }
                     >
                       <Streamdown>{part.text}</Streamdown>
+                      {status === "streaming" &&
+                        message.id === lastMessage?.id &&
+                        i === message.parts.length - 1 && (
+                          <span className="bg-foreground/70 ml-0.5 inline-block h-4 w-2 animate-pulse rounded-[2px] align-text-bottom" />
+                        )}
                     </MessageContent>
                   </Message>
                 ) : null
@@ -179,7 +232,16 @@ export default function Home() {
         </PromptInputBody>
         <PromptInputFooter>
           <div />
-          <PromptInputSubmit disabled={!input.trim()} status={status} />
+          <PromptInputSubmit
+            disabled={status === "ready" && !input.trim()}
+            status={status}
+            onClick={(e) => {
+              if (status === "streaming" || status === "submitted") {
+                e.preventDefault();
+                stop();
+              }
+            }}
+          />
         </PromptInputFooter>
       </PromptInput>
     </div>
