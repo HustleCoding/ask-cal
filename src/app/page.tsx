@@ -4,28 +4,27 @@ import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { useEffect, useState } from "react";
 import {
-  Conversation,
-  ConversationContent,
-  ConversationEmptyState,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
+  ChatContainerContent,
+  ChatContainerRoot,
+  ChatContainerScrollAnchor,
+} from "@/components/ui/chat-container";
+import { Message, MessageContent } from "@/components/ui/message";
 import {
   PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
+  PromptInputAction,
+  PromptInputActions,
   PromptInputTextarea,
-  type PromptInputMessage,
-} from "@/components/ai-elements/prompt-input";
+} from "@/components/ui/prompt-input";
+import { ScrollButton } from "@/components/ui/scroll-button";
+import { Loader } from "@/components/ui/loader";
+import { Button } from "@/components/ui/button";
 import {
-  Sources,
-  SourcesContent,
-  SourcesTrigger,
-} from "@/components/ai-elements/sources";
-import { Streamdown } from "streamdown";
-import { Spinner } from "@/components/ui/spinner";
-import { BookOpenIcon, SquarePenIcon } from "lucide-react";
+  ArrowUpIcon,
+  BookOpenIcon,
+  LibraryIcon,
+  SquareIcon,
+  SquarePenIcon,
+} from "lucide-react";
 
 type AskCalMessage = UIMessage<
   never,
@@ -48,6 +47,7 @@ export default function Home() {
   const { messages, sendMessage, status, stop, setMessages } =
     useChat<AskCalMessage>();
   const lastMessage = messages[messages.length - 1];
+  const isBusy = status === "streaming" || status === "submitted";
   const [input, setInput] = useState("");
 
   useEffect(() => {
@@ -73,9 +73,13 @@ export default function Home() {
     localStorage.removeItem(STORAGE_KEY);
   };
 
-  const handleSubmit = (message: PromptInputMessage) => {
-    if (!message.text.trim()) return;
-    sendMessage({ text: message.text });
+  const handleSubmit = () => {
+    if (isBusy) {
+      stop();
+      return;
+    }
+    if (!input.trim()) return;
+    sendMessage({ text: input });
     setInput("");
   };
 
@@ -108,10 +112,10 @@ export default function Home() {
         )}
       </header>
 
-      <Conversation className="flex-1">
-        <ConversationContent>
-          {messages.length === 0 && (
-            <ConversationEmptyState>
+      <div className="relative flex-1 overflow-hidden">
+        <ChatContainerRoot className="h-full">
+          <ChatContainerContent className="gap-8 py-6">
+            {messages.length === 0 && (
               <div className="mx-auto max-w-xl pt-10 text-center">
                 <p className="text-accent-foreground mb-3 text-xs font-medium tracking-[0.2em] uppercase">
                   The complete archive, 2007 → today
@@ -137,112 +141,136 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-            </ConversationEmptyState>
-          )}
-          {messages.map((message) => (
-            <div key={message.id}>
-              {message.role === "assistant" &&
-                message.parts.map((part, i) =>
-                  part.type === "data-sources" ? (
-                    <Sources className="mb-1" key={`${message.id}-srcs-${i}`}>
-                      <SourcesTrigger count={part.data.length} />
-                      <SourcesContent className="w-full max-w-xl">
-                        {part.data.map((s) => (
-                          <a
-                            key={s.url}
-                            href={s.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="bg-card hover:border-primary/40 block rounded-xl border px-3.5 py-2.5 shadow-xs transition-colors"
-                          >
-                            <span className="text-foreground block text-sm font-medium">
-                              {s.title}{" "}
-                              <span className="text-muted-foreground font-normal">
-                                · {s.year}
-                              </span>
-                            </span>
-                            <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
-                              “{s.excerpt}”
-                            </span>
-                          </a>
-                        ))}
-                      </SourcesContent>
-                    </Sources>
-                  ) : null
-                )}
-              {message.parts.map((part, i) =>
-                part.type === "text" ? (
-                  <Message from={message.role} key={`${message.id}-${i}`}>
-                    <MessageContent
-                      className={
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-3 shadow-sm"
-                          : "bg-card rounded-2xl rounded-bl-sm border px-4 py-3.5 leading-relaxed shadow-xs"
-                      }
-                    >
-                      <Streamdown>{part.text}</Streamdown>
-                      {status === "streaming" &&
-                        message.id === lastMessage?.id &&
-                        i === message.parts.length - 1 && (
-                          <span className="bg-foreground/70 ml-0.5 inline-block h-4 w-2 animate-pulse rounded-[2px] align-text-bottom" />
-                        )}
-                    </MessageContent>
-                  </Message>
-                ) : null
-              )}
-              {message.role === "assistant" &&
-                message.id === lastMessage?.id &&
-                status === "ready" &&
-                message.parts.map((part, i) =>
-                  part.type === "data-followups" ? (
-                    <div
-                      className="mt-3 flex flex-wrap gap-2"
-                      key={`${message.id}-fu-${i}`}
-                    >
-                      {part.data.map((q) => (
-                        <button
-                          key={q}
-                          className="text-muted-foreground hover:border-primary/40 hover:text-accent-foreground bg-card rounded-full border px-3 py-1 text-xs shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm"
-                          onClick={() => sendMessage({ text: q })}
-                          type="button"
+            )}
+
+            {messages.map((message) =>
+              message.role === "user" ? (
+                <Message key={message.id} className="justify-end">
+                  <MessageContent className="bg-primary text-primary-foreground max-w-[85%] rounded-3xl rounded-br-md px-5 py-3 shadow-sm sm:max-w-[75%]">
+                    {message.parts
+                      .filter((p) => p.type === "text")
+                      .map((p) => p.text)
+                      .join("")}
+                  </MessageContent>
+                </Message>
+              ) : (
+                <div key={message.id} className="flex flex-col gap-5">
+                  {message.parts.map((part, i) =>
+                    part.type === "text" ? (
+                      <Message key={`${message.id}-${i}`} className="gap-0">
+                        <MessageContent
+                          markdown
+                          className="w-full max-w-none bg-transparent p-0 text-[0.95rem] leading-7 [&>h1]:font-serif [&>h2]:font-serif [&>h3]:font-serif [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-1.5 [&>p]:my-3 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>ul]:my-3 [&>ul]:list-disc [&>ul]:space-y-2 [&>ul]:pl-5 [&>ol]:my-3 [&>ol]:list-decimal [&>ol]:space-y-2 [&>ol]:pl-5 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:pl-4 [&_blockquote]:italic"
                         >
-                          {q}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null
-                )}
-            </div>
-          ))}
-          {status === "submitted" && <Spinner className="mx-auto my-4" />}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
+                          {part.text +
+                            (status === "streaming" &&
+                            message.id === lastMessage?.id &&
+                            i === message.parts.length - 1
+                              ? " ▍"
+                              : "")}
+                        </MessageContent>
+                      </Message>
+                    ) : null
+                  )}
+
+                  {message.parts.map((part, i) =>
+                    part.type === "data-sources" && part.data.length > 0 ? (
+                      <div key={`${message.id}-srcs-${i}`}>
+                        <p className="text-muted-foreground mb-2.5 flex items-center gap-1.5 text-xs font-medium tracking-[0.14em] uppercase">
+                          <LibraryIcon className="size-3.5" />
+                          From the archive
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {part.data.slice(0, 4).map((s) => (
+                            <a
+                              key={s.url}
+                              href={s.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group bg-card hover:border-primary/40 block rounded-xl border px-4 py-3 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm"
+                            >
+                              <span className="text-foreground group-hover:text-primary block font-serif text-sm font-semibold transition-colors">
+                                {s.title}
+                              </span>
+                              <span className="text-muted-foreground mt-1 line-clamp-2 block text-xs leading-relaxed">
+                                “{s.excerpt}”
+                              </span>
+                              <span className="text-muted-foreground/80 mt-1.5 block text-[11px]">
+                                calnewport.com · {s.year}
+                              </span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null
+                  )}
+
+                  {message.id === lastMessage?.id &&
+                    status === "ready" &&
+                    message.parts.map((part, i) =>
+                      part.type === "data-followups" ? (
+                        <div
+                          className="flex flex-wrap gap-2"
+                          key={`${message.id}-fu-${i}`}
+                        >
+                          {part.data.map((q) => (
+                            <button
+                              key={q}
+                              className="text-muted-foreground hover:border-primary/40 hover:text-accent-foreground bg-card rounded-full border px-3.5 py-1.5 text-xs shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm"
+                              onClick={() => sendMessage({ text: q })}
+                              type="button"
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null
+                    )}
+                </div>
+              )
+            )}
+
+            {status === "submitted" && (
+              <div className="text-muted-foreground flex items-center gap-2.5 text-sm">
+                <Loader variant="typing" size="sm" />
+                Searching the archive…
+              </div>
+            )}
+            <ChatContainerScrollAnchor />
+          </ChatContainerContent>
+          <div className="absolute right-0 bottom-3 left-0 flex justify-center">
+            <ScrollButton className="bg-card shadow-md" />
+          </div>
+        </ChatContainerRoot>
+      </div>
 
       <PromptInput
+        value={input}
+        onValueChange={setInput}
         onSubmit={handleSubmit}
-        className="bg-card mt-2 rounded-2xl border shadow-md shadow-black/5 transition-shadow focus-within:shadow-lg focus-within:shadow-black/10"
+        isLoading={isBusy}
+        className="bg-card mt-2 rounded-3xl border shadow-md shadow-black/5 transition-shadow focus-within:shadow-lg focus-within:shadow-black/10"
       >
-        <PromptInputBody>
-          <PromptInputTextarea
-            onChange={(e) => setInput(e.target.value)}
-            value={input}
-            placeholder="Ask about deep work, focus, studying..."
-          />
-        </PromptInputBody>
-        <PromptInputFooter>
-          <div />
-          <PromptInputSubmit
-            disabled={status === "ready" && !input.trim()}
-            status={status}
-            onClick={(e) => {
-              if (status === "streaming" || status === "submitted") {
-                e.preventDefault();
-                stop();
-              }
-            }}
-          />
-        </PromptInputFooter>
+        <PromptInputTextarea placeholder="Ask about deep work, focus, studying..." />
+        <PromptInputActions className="justify-end pt-1">
+          <PromptInputAction
+            tooltip={isBusy ? "Stop generating" : "Send"}
+          >
+            <Button
+              size="icon"
+              className="size-9 rounded-full shadow-sm"
+              disabled={!isBusy && !input.trim()}
+              onClick={handleSubmit}
+              aria-label={isBusy ? "Stop generating" : "Send"}
+            >
+              {isBusy ? (
+                <SquareIcon className="size-4 fill-current" />
+              ) : (
+                <ArrowUpIcon className="size-4.5" />
+              )}
+            </Button>
+          </PromptInputAction>
+        </PromptInputActions>
       </PromptInput>
     </div>
   );
