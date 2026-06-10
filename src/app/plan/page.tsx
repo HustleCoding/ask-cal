@@ -12,6 +12,8 @@ import {
 import { Message, MessageContent } from "@/components/ui/message";
 import { Loader } from "@/components/ui/loader";
 import { Button } from "@/components/ui/button";
+import { ShareButton } from "@/components/share-button";
+import { linkCitations } from "@/lib/citations";
 
 type Source = {
   title: string;
@@ -102,7 +104,8 @@ export default function PlanPage() {
     URL.revokeObjectURL(a.href);
   };
 
-  const showResult = phase === "streaming" || phase === "done";
+  const showResult =
+    phase === "loading" || phase === "streaming" || phase === "done";
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-4 pb-10">
@@ -193,20 +196,13 @@ export default function PlanPage() {
 
             <Button
               className="mt-1 h-11 rounded-xl text-sm font-medium shadow-sm"
-              disabled={!role.trim() || !struggle.trim() || phase === "loading"}
+              disabled={!role.trim() || !struggle.trim()}
               onClick={generate}
             >
-              {phase === "loading" ? (
-                <span className="flex items-center gap-2">
-                  <Loader variant="typing" size="sm" />
-                  Searching the archive…
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <MapIcon className="size-4" />
-                  Build my plan
-                </span>
-              )}
+              <span className="flex items-center gap-2">
+                <MapIcon className="size-4" />
+                Build my plan
+              </span>
             </Button>
           </div>
         </div>
@@ -214,12 +210,48 @@ export default function PlanPage() {
 
       {showResult && (
         <div className="flex flex-col gap-6 py-8">
+          {sources.length > 0 && (
+            <div>
+              <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium tracking-[0.14em] uppercase">
+                <LibraryIcon className="size-3.5" />
+                Drawing from
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {sources.slice(0, 6).map((s) => (
+                  <a
+                    key={s.url}
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground hover:border-primary/40 hover:text-accent-foreground bg-card max-w-full truncate rounded-full border px-3 py-1 text-xs shadow-xs transition-colors"
+                  >
+                    {s.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {phase === "loading" && (
+            <div className="text-muted-foreground flex items-center gap-2.5 pt-2 text-sm">
+              <Loader variant="typing" size="sm" />
+              Searching 15,001 excerpts from the essays and podcast…
+            </div>
+          )}
+          {phase === "streaming" && plan.length === 0 && (
+            <div className="text-muted-foreground flex items-center gap-2.5 pt-2 text-sm">
+              <Loader variant="typing" size="sm" />
+              Writing your plan…
+            </div>
+          )}
+
           <Message className="gap-0">
             <MessageContent
               markdown
               className="w-full max-w-none bg-transparent p-0 text-[0.95rem] leading-7 [&>h1]:font-serif [&>h2]:font-serif [&>h3]:font-serif [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-1.5 [&>p]:my-3 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>ul]:my-3 [&>ul]:list-disc [&>ul]:space-y-2 [&>ul]:pl-5 [&>ol]:my-3 [&>ol]:list-decimal [&>ol]:space-y-2 [&>ol]:pl-5 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_table]:my-3 [&_table]:w-full [&_th]:border-b [&_th]:py-1.5 [&_th]:text-left [&_td]:border-b [&_td]:border-border/50 [&_td]:py-1.5"
             >
-              {plan + (phase === "streaming" ? " ▍" : "")}
+              {linkCitations(plan, sources) +
+                (phase === "streaming" ? " ▍" : "")}
             </MessageContent>
           </Message>
 
@@ -234,6 +266,21 @@ export default function PlanPage() {
                   <DownloadIcon className="size-3.5" />
                   Download as markdown
                 </Button>
+                <ShareButton
+                  getPayload={() => ({
+                    q: `A deep work system for a ${role.trim()}`,
+                    a: plan,
+                    sources: sources
+                      .slice(0, 4)
+                      .map(({ title, url, year, type }) => ({
+                        title,
+                        url,
+                        year,
+                        type,
+                      })),
+                  })}
+                  className="text-muted-foreground hover:border-primary/40 hover:text-accent-foreground bg-card border-input flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs shadow-xs transition-all duration-200"
+                />
                 <Button
                   variant="outline"
                   className="rounded-full text-xs shadow-xs"

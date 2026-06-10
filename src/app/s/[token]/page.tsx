@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { BookOpenIcon, LibraryIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { decodeShare } from "@/lib/share";
+import { linkCitations } from "@/lib/citations";
 
 type Props = { params: Promise<{ token: string }> };
 
@@ -61,7 +62,7 @@ export default async function SharedAnswerPage({ params }: Props) {
         </h2>
 
         <div className="prose-sm w-full max-w-none text-[0.95rem] leading-7 [&>h2]:font-serif [&>h3]:font-serif [&>p]:my-3 [&>ul]:my-3 [&>ul]:list-disc [&>ul]:space-y-2 [&>ul]:pl-5 [&>ol]:my-3 [&>ol]:list-decimal [&>ol]:space-y-2 [&>ol]:pl-5 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
-          <ReactMarkdown>{shared.a}</ReactMarkdown>
+          <ReactMarkdown>{linkCitations(shared.a, shared.sources)}</ReactMarkdown>
         </div>
 
         {shared.sources.length > 0 && (

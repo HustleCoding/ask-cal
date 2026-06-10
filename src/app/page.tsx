@@ -19,13 +19,14 @@ import {
 import { ScrollButton } from "@/components/ui/scroll-button";
 import { Loader } from "@/components/ui/loader";
 import { Button } from "@/components/ui/button";
+import { ShareButton } from "@/components/share-button";
+import { linkCitations } from "@/lib/citations";
 import {
+  ArrowRightIcon,
   ArrowUpIcon,
   BookOpenIcon,
-  CheckIcon,
   LibraryIcon,
   MapIcon,
-  Share2Icon,
   SquareIcon,
   SquarePenIcon,
 } from "lucide-react";
@@ -59,9 +60,8 @@ export default function Home() {
   const lastMessage = messages[messages.length - 1];
   const isBusy = status === "streaming" || status === "submitted";
   const [input, setInput] = useState("");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const shareAnswer = async (message: AskCalMessage) => {
+  const sharePayload = (message: AskCalMessage) => {
     const idx = messages.findIndex((m) => m.id === message.id);
     const prevUser = [...messages.slice(0, idx)]
       .reverse()
@@ -75,28 +75,12 @@ export default function Home() {
       .filter((p) => p.type === "text")
       .map((p) => p.text)
       .join("");
-    const sources =
-      message.parts
-        .filter((p) => p.type === "data-sources")
-        .flatMap((p) => p.data)
-        .slice(0, 4)
-        .map(({ title, url, year, type }) => ({ title, url, year, type })) ??
-      [];
-    try {
-      const res = await fetch("/api/share", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q, a, sources }),
-      });
-      const { token } = await res.json();
-      await navigator.clipboard.writeText(
-        `${window.location.origin}/s/${token}`
-      );
-      setCopiedId(message.id);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch {
-      // clipboard or network unavailable
-    }
+    const sources = message.parts
+      .filter((p) => p.type === "data-sources")
+      .flatMap((p) => p.data)
+      .slice(0, 4)
+      .map(({ title, url, year, type }) => ({ title, url, year, type }));
+    return { q, a, sources };
   };
 
   useEffect(() => {
@@ -193,6 +177,24 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
+                <Link
+                  href="/plan"
+                  className="group bg-card hover:border-primary/40 mx-auto mt-8 flex max-w-md items-center gap-4 rounded-2xl border px-5 py-4 text-left shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm"
+                >
+                  <span className="bg-accent text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-xl">
+                    <MapIcon className="size-4.5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="text-foreground group-hover:text-primary block font-serif text-sm font-semibold transition-colors">
+                      Want more than an answer? Build my system
+                    </span>
+                    <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                      Four questions about your situation → a personalized
+                      deep work plan, grounded in Cal&apos;s frameworks.
+                    </span>
+                  </span>
+                  <ArrowRightIcon className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
+                </Link>
               </div>
             )}
 
@@ -208,14 +210,18 @@ export default function Home() {
                 </Message>
               ) : (
                 <div key={message.id} className="flex flex-col gap-5">
-                  {message.parts.map((part, i) =>
+                  {(() => {
+                    const msgSources = message.parts
+                      .filter((p) => p.type === "data-sources")
+                      .flatMap((p) => p.data);
+                    return message.parts.map((part, i) =>
                     part.type === "text" ? (
                       <Message key={`${message.id}-${i}`} className="gap-0">
                         <MessageContent
                           markdown
                           className="w-full max-w-none bg-transparent p-0 text-[0.95rem] leading-7 [&>h1]:font-serif [&>h2]:font-serif [&>h3]:font-serif [&>h2]:mt-6 [&>h2]:mb-2 [&>h3]:mt-5 [&>h3]:mb-1.5 [&>p]:my-3 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>ul]:my-3 [&>ul]:list-disc [&>ul]:space-y-2 [&>ul]:pl-5 [&>ol]:my-3 [&>ol]:list-decimal [&>ol]:space-y-2 [&>ol]:pl-5 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:pl-4 [&_blockquote]:italic"
                         >
-                          {part.text +
+                          {linkCitations(part.text, msgSources) +
                             (status === "streaming" &&
                             message.id === lastMessage?.id &&
                             i === message.parts.length - 1
@@ -224,7 +230,8 @@ export default function Home() {
                         </MessageContent>
                       </Message>
                     ) : null
-                  )}
+                    );
+                  })()}
 
                   {message.parts.map((part, i) =>
                     part.type === "data-sources" && part.data.length > 0 ? (
@@ -263,23 +270,7 @@ export default function Home() {
 
                   {(status === "ready" || message.id !== lastMessage?.id) && (
                     <div className="-mt-2 flex">
-                      <button
-                        className="text-muted-foreground hover:border-primary/40 hover:text-accent-foreground bg-card flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-xs transition-all duration-200"
-                        onClick={() => shareAnswer(message)}
-                        type="button"
-                      >
-                        {copiedId === message.id ? (
-                          <>
-                            <CheckIcon className="size-3" />
-                            Link copied
-                          </>
-                        ) : (
-                          <>
-                            <Share2Icon className="size-3" />
-                            Share
-                          </>
-                        )}
-                      </button>
+                      <ShareButton getPayload={() => sharePayload(message)} />
                     </div>
                   )}
 
