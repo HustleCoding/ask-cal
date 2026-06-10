@@ -47,9 +47,9 @@ export default function Home() {
   return (
     <div className="mx-auto flex h-dvh max-w-3xl flex-col p-4">
       <header className="mb-2 flex items-center gap-2 border-b pb-3">
-        <BookOpenIcon className="size-5" />
-        <h1 className="font-semibold">Ask Cal</h1>
-        <span className="text-muted-foreground text-sm">
+        <BookOpenIcon className="size-5 shrink-0" />
+        <h1 className="shrink-0 font-semibold">Ask Cal</h1>
+        <span className="text-muted-foreground hidden text-sm sm:inline">
           — answers from 1,117 calnewport.com articles (2007–present)
         </span>
       </header>
