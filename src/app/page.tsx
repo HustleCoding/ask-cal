@@ -113,7 +113,7 @@ export default function Home() {
       </header>
 
       <div className="relative flex-1 overflow-hidden">
-        <ChatContainerRoot className="h-full">
+        <ChatContainerRoot className="scrollbar-hidden h-full">
           <ChatContainerContent className="gap-8 py-6">
             {messages.length === 0 && (
               <div className="mx-auto max-w-xl pt-10 text-center">
