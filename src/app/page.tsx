@@ -2,6 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ChatContainerContent,
@@ -21,7 +22,10 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowUpIcon,
   BookOpenIcon,
+  CheckIcon,
   LibraryIcon,
+  MapIcon,
+  Share2Icon,
   SquareIcon,
   SquarePenIcon,
 } from "lucide-react";
@@ -55,6 +59,45 @@ export default function Home() {
   const lastMessage = messages[messages.length - 1];
   const isBusy = status === "streaming" || status === "submitted";
   const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const shareAnswer = async (message: AskCalMessage) => {
+    const idx = messages.findIndex((m) => m.id === message.id);
+    const prevUser = [...messages.slice(0, idx)]
+      .reverse()
+      .find((m) => m.role === "user");
+    const q =
+      prevUser?.parts
+        ?.filter((p) => p.type === "text")
+        .map((p) => p.text)
+        .join(" ") ?? "";
+    const a = message.parts
+      .filter((p) => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+    const sources =
+      message.parts
+        .filter((p) => p.type === "data-sources")
+        .flatMap((p) => p.data)
+        .slice(0, 4)
+        .map(({ title, url, year, type }) => ({ title, url, year, type })) ??
+      [];
+    try {
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q, a, sources }),
+      });
+      const { token } = await res.json();
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/s/${token}`
+      );
+      setCopiedId(message.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // clipboard or network unavailable
+    }
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -103,12 +146,16 @@ export default function Home() {
             1,117 essays + 400 Deep Questions episodes · 2007–present
           </p>
         </div>
-        <span className="text-accent-foreground bg-accent ml-auto hidden shrink-0 rounded-full px-3 py-1 text-xs font-medium sm:inline">
-          Deep work, on demand
-        </span>
+        <Link
+          href="/plan"
+          className="text-accent-foreground bg-accent hover:bg-accent/80 ml-auto flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+        >
+          <MapIcon className="size-3.5" />
+          Build my system
+        </Link>
         {messages.length > 0 && (
           <button
-            className="text-muted-foreground hover:text-foreground hover:border-primary/40 bg-card ml-auto flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-xs transition-colors sm:ml-3"
+            className="text-muted-foreground hover:text-foreground hover:border-primary/40 bg-card ml-3 flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-xs transition-colors"
             onClick={newChat}
             type="button"
           >
@@ -212,6 +259,28 @@ export default function Home() {
                         </div>
                       </div>
                     ) : null
+                  )}
+
+                  {(status === "ready" || message.id !== lastMessage?.id) && (
+                    <div className="-mt-2 flex">
+                      <button
+                        className="text-muted-foreground hover:border-primary/40 hover:text-accent-foreground bg-card flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-xs transition-all duration-200"
+                        onClick={() => shareAnswer(message)}
+                        type="button"
+                      >
+                        {copiedId === message.id ? (
+                          <>
+                            <CheckIcon className="size-3" />
+                            Link copied
+                          </>
+                        ) : (
+                          <>
+                            <Share2Icon className="size-3" />
+                            Share
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
 
                   {message.id === lastMessage?.id &&
