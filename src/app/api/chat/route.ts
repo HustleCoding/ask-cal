@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       writer.write({ type: "data-sources", data: sources });
 
       const result = streamText({
-        model: openrouter.chat("deepseek/deepseek-v4-flash"),
+        model: openrouter.chat("anthropic/claude-haiku-4.5"),
         system: `${SYSTEM}\n\nRelevant excerpts from Cal Newport's blog and podcast:\n\n${context}`,
         messages: modelMessages,
       });
