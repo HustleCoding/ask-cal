@@ -1,36 +1,25 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ask Cal
 
-## Getting Started
+A RAG chatbot over Cal Newport's complete blog archive (calnewport.com, 2007–present, 1,117 articles). Ask anything about deep work, digital minimalism, study habits, or slow productivity and get answers grounded in his actual writing, with cited source articles.
 
-First, run the development server:
+## How it works
+
+- `scripts/scrape.py` — scrapes all posts via the WordPress REST API into markdown + `index.json`.
+- `scripts/build-index.mjs` — chunks the articles (~350 words, overlapping) into `data/chunks.json`.
+- `src/lib/retrieval.ts` — in-memory BM25 search over the chunks (no vector DB needed).
+- `src/app/api/chat/route.ts` — retrieves the top chunks for the question, streams an answer from DeepSeek V4 Flash (via OpenRouter) using the AI SDK, and emits the source articles as citation parts.
+- `src/app/page.tsx` — chat UI built with [AI Elements](https://ai-sdk.dev/elements) (shadcn/ui-based components: conversation, message, prompt input, sources).
+
+## Setup
 
 ```bash
+npm install
+cp .env.example .env.local   # add your OpenRouter API key
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Description |
+| --- | --- |
+| `OPENROUTER_API_KEY` | OpenRouter API key used for chat completions |
