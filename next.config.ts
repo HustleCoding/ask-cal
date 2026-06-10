@@ -13,6 +13,17 @@ const nextConfig: NextConfig = {
       "./node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_shared.so",
       "./node_modules/onnxruntime-node/bin/napi-v6/linux/x64/onnxruntime_binding.node",
     ],
+    "/api/plan": [
+      "./data/**",
+      "./node_modules/@huggingface/transformers/.cache/Xenova/all-MiniLM-L6-v2/config.json",
+      "./node_modules/@huggingface/transformers/.cache/Xenova/all-MiniLM-L6-v2/tokenizer.json",
+      "./node_modules/@huggingface/transformers/.cache/Xenova/all-MiniLM-L6-v2/tokenizer_config.json",
+      "./node_modules/@huggingface/transformers/.cache/Xenova/all-MiniLM-L6-v2/onnx/model.onnx",
+      "./node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime.so.1",
+      "./node_modules/onnxruntime-node/bin/napi-v6/linux/x64/libonnxruntime_providers_shared.so",
+      "./node_modules/onnxruntime-node/bin/napi-v6/linux/x64/onnxruntime_binding.node",
+    ],
+    "/s/[token]/opengraph-image": ["./src/assets/fraunces-600.ttf"],
   },
   outputFileTracingExcludes: {
     "*": [
