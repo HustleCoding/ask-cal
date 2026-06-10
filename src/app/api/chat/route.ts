@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       );
 
       const followups = generateText({
-        model: openrouter.chat("deepseek/deepseek-v4-flash"),
+        model: openrouter.chat("anthropic/claude-haiku-4.5"),
         prompt: `A reader asked Cal Newport's archive: "${lastQuestion}"\n\nBased on these article excerpts, suggest 3 natural follow-up questions the reader might ask next. Each under 9 words. Return exactly 3 questions, one per line, no numbering or bullets.\n\n${context.slice(0, 4000)}`,
       })
         .then((r) =>
