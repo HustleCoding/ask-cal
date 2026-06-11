@@ -97,7 +97,7 @@ export default async function SharedAnswerPage({ params }: Props) {
 
         <div className="bg-card mt-2 rounded-2xl border px-5 py-4 text-center shadow-xs">
           <p className="text-sm">
-            Every answer is grounded in 1,117 essays and 400+ Deep Questions
+            Every answer is grounded in 1,117 essays and 429 Deep Questions
             episodes.
           </p>
           <Link

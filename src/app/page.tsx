@@ -127,7 +127,7 @@ export default function Home() {
             Ask Cal
           </h1>
           <p className="text-muted-foreground truncate text-xs">
-            1,117 essays + 400 Deep Questions episodes · 2007–present
+            1,117 essays + 429 Deep Questions episodes · 2007–present
           </p>
         </div>
         <Link

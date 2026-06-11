@@ -235,7 +235,7 @@ export default function PlanPage() {
           {phase === "loading" && (
             <div className="text-muted-foreground flex items-center gap-2.5 pt-2 text-sm">
               <Loader variant="typing" size="sm" />
-              Searching 15,001 excerpts from the essays and podcast…
+              Searching 15,784 excerpts from the essays and podcast…
             </div>
           )}
           {phase === "streaming" && plan.length === 0 && (
