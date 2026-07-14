@@ -314,6 +314,9 @@ export default function Planner({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDay = useRef<Partial<Pick<Day, "notes" | "shutdown_complete">>>({});
+  const pendingDayId = useRef<string | null>(null);
+  const dayId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -362,6 +365,7 @@ export default function Planner({ userId }: { userId: string }) {
     }
     setSettings(setting);
     setDay(currentDay);
+    dayId.current = currentDay.id;
     setBlocks(blocksResult.data ?? []);
     setTasks(tasksResult.data ?? []);
     setLoading(false);
@@ -397,10 +401,20 @@ export default function Planner({ userId }: { userId: string }) {
 
   const updateDay = (values: Partial<Pick<Day, "notes" | "shutdown_complete">>) => {
     setDay((current) => current ? { ...current, ...values } : current);
-    if (!day) return;
+    const currentDayId = dayId.current;
+    if (!currentDayId) return;
+    if (pendingDayId.current !== currentDayId) {
+      pendingDay.current = {};
+      pendingDayId.current = currentDayId;
+    }
+    pendingDay.current = { ...pendingDay.current, ...values };
     if (notesTimer.current) clearTimeout(notesTimer.current);
     notesTimer.current = setTimeout(async () => {
-      const { error: updateError } = await supabase.from("days").update(values).eq("id", day.id);
+      const updates = pendingDay.current;
+      pendingDay.current = {};
+      pendingDayId.current = null;
+      notesTimer.current = null;
+      const { error: updateError } = await supabase.from("days").update(updates).eq("id", currentDayId);
       if (updateError) setError(updateError.message);
     }, 500);
   };
